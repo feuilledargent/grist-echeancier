@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Échéancier PDF</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div id="app">
+    <div id="controls">
+      <button id="btn-refresh">Rafraîchir données</button>
+      <button id="btn-generate">Générer PDF</button>
+      <span id="status" aria-live="polite"></span>
+    </div>
+
+    <!-- Contenu à rendre en PDF -->
+    <div id="pdf-content">
+      <!-- En-tête (rappel des paramètres) -->
+      <div id="header-block" class="header-block">
+        <h1>Récapitulatif du prêt</h1>
+        <div class="grid">
+          <div class="cell"><strong>Montant :</strong> <span id="montant">—</span></div>
+          <div class="cell"><strong>Taux :</strong> <span id="taux">—</span></div>
+          <div class="cell"><strong>Mensualité :</strong> <span id="mensualite">—</span></div>
+          <div class="cell"><strong>Durée (mois) :</strong> <span id="duree">—</span></div>
+          <div class="cell"><strong>Total intérêts :</strong> <span id="total-interets">—</span></div>
+          <div class="cell"><strong>Coût total du crédit :</strong> <span id="cout-total">—</span></div>
+        </div>
+      </div>
+
+      <!-- Tableau d'échéancier -->
+      <div id="table-block">
+        <h2>Tableau d'amortissement</h2>
+        <table id="amort-table">
+          <thead>
+            <tr>
+              <th>№</th>
+              <th>Date</th>
+              <th>Capital initial</th>
+              <th>Intérêts</th>
+              <th>Frais</th>
+              <th>Capital remboursé</th>
+              <th>Capital final</th>
+              <th>Mensualité</th>
+            </tr>
+          </thead>
+          <tbody id="amort-tbody">
+            <!-- Rempli en JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Zone invisible qui servira pour page numbers (html2pdf renvoie pdf objet) -->
+  </div>
+
+  <!-- html2pdf (CDN) -->
+  <script src="https://unpkg.com/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+  <script src="./script.js"></script>
+</body>
+</html>
