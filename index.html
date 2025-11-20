@@ -196,7 +196,7 @@ document.addEventListener("click", (e) => {
     const element = document.getElementById("pdf-content");
     const opt = {
       margin: 10,
-      filename: "echeancier.pdf",
+      filename: `Echéancier ${fmtNum(params.Montant).replace(/\s/g,'')}€ à ${params.TauxAnnuel > 1 ? params.TauxAnnuel : (params.TauxAnnuel*100).toFixed(2)}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2 },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
