@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Échéancier Prêt</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 20px; }
+h1 { margin-bottom: 15px; }
+form input, form select { margin: 5px; padding: 5px; }
+table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+th, td { border: 1px solid #ccc; padding: 6px; text-align: right; }
+th { background: #f0f0f0; }
+.page-counter { text-align: center; font-weight: bold; }
+.page-break { page-break-after: always; }
+#btn-print { margin-top: 15px; padding: 10px 15px; background: #0078d7; color: #fff; border: none; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<h1>Simulateur d'Échéancier</h1>
+
+<form id="loan-form">
+  <label>Montant (€): <input type="number" id="montant" required></label>
+  <label>Taux annuel (%): <input type="number" step="0.01" id="taux" required></label>
+  <label>Durée (années): <input type="number" id="dureeAnnees" required></label>
+  <label>Date 1ère échéance: <input type="date" id="datePrem"></label>
+  <label>Frais fixes par échéance (€): <input type="number" id="fraisFixes" value="0"></label>
+  <button type="submit">Calculer</button>
+</form>
+
+<h2>Récapitulatif du prêt</h2>
+<p>Montant : <span id="recap-montant">—</span> | Taux : <span id="recap-taux">—</span> | Mensualité : <span id="recap-mensualite">—</span> | Durée : <span id="recap-duree">—</span></p>
+<p>Total intérêts : <span id="recap-interets">—</span> | Coût total crédit : <span id="recap-cout">—</span></p>
+
+<table>
+<thead>
+<tr>
+<th>№</th><th>Date</th><th>Capital initial</th><th>Intérêts</th><th>Frais</th><th>Capital remboursé</th><th>Capital final</th><th>Mensualité</th>
+</tr>
+</thead>
+<tbody id="tbody"></tbody>
+</table>
+
+<button id="btn-print">Imprimer</button>
+
+<script>
+function fmtNum(n){return (n==null||isNaN(n))?"—":Number(n).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtDate(d){const dt=new Date(d);return isNaN(dt)?"—":dt.toLocaleDateString("fr-FR");}
+function round2(n){return Math.round(Number(n)*100)/100;}
+
+document.getElementById("loan-form").addEventListener("submit",function(e){
+  e.preventDefault();
+  const montant=Number(document.getElementById("montant").value);
+  const dureeAnnees=Number(document.getElementById("dureeAnnees").value);
+  const duree=dureeAnnees*12; // conversion en mois
+  let tauxAnnuel=Number(document.getElementById("taux").value)/100;
+  const fraisFixes=Number(document.getElementById("fraisFixes").value);
+  const datePrem=document.getElementById("datePrem").value?new Date(document.getElementById("datePrem").value):new Date();
+
+  const tauxMensuel=tauxAnnuel/12;
+  let mensualiteBase=(tauxMensuel>0)?montant*tauxMensuel/(1-Math.pow(1+tauxMensuel,-duree)):montant/duree;
+  mensualiteBase=round2(mensualiteBase);
+
+  let capitalRestant=round2(montant);
+  const rows=[];
+  let totalInterets=0,totalFrais=0;
+  for(let i=1;i<=duree;i++){
+    const interet=round2(capitalRestant*tauxMensuel);
+    const frais=round2(fraisFixes);
+    let capitalRemb=round2(mensualiteBase-interet);
+    if(i===duree&&capitalRemb>capitalRestant)capitalRemb=capitalRestant;
+    const capitalFinal=round2(capitalRestant-capitalRemb);
+    const mensualiteTotale=round2(mensualiteBase+frais);
+    const dateEch=new Date(datePrem.getFullYear(),datePrem.getMonth()+(i-1),datePrem.getDate());
+    rows.push({Numero:i,Date:dateEch,CapitalInitial:capitalRestant,Interets:interet,MontantFrais:frais,CapitalRembourse:capitalRemb,CapitalFinal:capitalFinal,Mensualite:mensualiteTotale});
+    totalInterets=round2(totalInterets+interet);
+    totalFrais=round2(totalFrais+frais);
+    capitalRestant=capitalFinal;
+  }
+  const coutTotal=round2(montant+totalInterets+totalFrais);
+
+  document.getElementById("recap-montant").textContent=fmtNum(montant);
+  document.getElementById("recap-taux").textContent=(tauxAnnuel*100).toFixed(3)+" %";
+  document.getElementById("recap-mensualite").textContent=fmtNum(mensualiteBase);
+  document.getElementById("recap-duree").textContent=duree+" mois";
+  document.getElementById("recap-interets").textContent=fmtNum(totalInterets);
+  document.getElementById("recap-cout").textContent=fmtNum(coutTotal);
+
+  const tb=document.getElementById("tbody");
+  tb.innerHTML="";
+  let count=0,pageNumber=1;
+  const totalPages=Math.ceil(rows.length<=35?1:1+(rows.length-35)/40);
+  for(const r of rows){
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${r.Numero}</td><td>${fmtDate(r.Date)}</td><td>${fmtNum(r.CapitalInitial)}</td><td>${fmtNum(r.Interets)}</td><td>${fmtNum(r.MontantFrais)}</td><td>${fmtNum(r.CapitalRembourse)}</td><td>${fmtNum(r.CapitalFinal)}</td><td>${fmtNum(r.Mensualite)}</td>`;
+    tb.appendChild(tr);
+    count++;
+    const limit=pageNumber===1?35:39;
+    if(count===limit){
+      const counterRow=document.createElement("tr");
+      counterRow.innerHTML=`<td colspan="8" class="page-counter">Page ${pageNumber} sur ${totalPages}</td>`;
+      tb.appendChild(counterRow);
+      const breakRow=document.createElement("tr");
+      breakRow.classList.add("page-break");
+      tb.appendChild(breakRow);
+      pageNumber++;
+      count=0;
+    }
+  }
+  if(count>0){
+    const counterRow=document.createElement("tr");
+    counterRow.innerHTML=`<td colspan="8" class="page-counter">Page ${pageNumber} sur ${totalPages}</td>`;
+    tb.appendChild(counterRow);
+  }
+});
+
+document.getElementById("btn-print").addEventListener("click",()=>{parent.print();});
+</script>
+
+</body>
+</html>
