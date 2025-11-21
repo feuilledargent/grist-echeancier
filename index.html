@@ -1,9 +1,8 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Echéancier PDF</title>
+<meta charset="UTF-8">
+<title>Échéancier PDF</title>
 <style>
   body { font-family: Arial, sans-serif; margin: 12px; }
   #controls { margin-bottom: 10px; }
@@ -15,224 +14,51 @@
   th, td { padding: 6px 8px; border-bottom: 1px solid #eee; text-align: right; }
   td:nth-child(2), th:nth-child(2) { text-align: center; }
   tr:nth-child(2n) { background: #fbfbfb; }
-  .page-break { page-break-before: always; display: block; padding-top: 10px; }
+  .page-break { page-break-after: always; }
+  .page-counter { text-align: right; font-weight: bold; padding: 6px; font-size: 11px; }
+
+@media print {
+  #controls {
+    display: none !important; /* masque le bouton et la barre de contrôle */
+  }
+}
+
 </style>
 </head>
 <body>
+
 <div id="controls">
-  <button id="btn-refresh">Calculer</button>
-  <button id="btn-pdf">Exporter PDF</button>
+  <button id="btn-print">Imprimer / PDF</button>
 </div>
 
-<div id="pdf-content">
-  <div class="header-block">
-    <h1>Récapitulatif du prêt</h1>
-    <div class="grid">
-      <div><strong>Montant :</strong> <span id="montant">—</span></div>
-      <div><strong>Taux :</strong> <span id="taux">—</span></div>
-      <div><strong>Mensualité :</strong> <span id="mensualite">—</span></div>
-      <div><strong>Durée :</strong> <span id="duree">—</span></div>
-      <div><strong>Total intérêts :</strong> <span id="total-interets">—</span></div>
-      <div><strong>Coût total crédit :</strong> <span id="cout-total">—</span></div>
-    </div>
+<div class="header-block">
+  <h1>Récapitulatif du prêt</h1>
+  <div class="grid">
+    <div>Montant : <span id="montant">—</span></div>
+    <div>Taux : <span id="taux">—</span></div>
+    <div>Mensualité : <span id="mensualite">—</span></div>
+    <div>Durée : <span id="duree">—</span></div>
+    <div>Total intérêts : <span id="total-interets">—</span></div>
+    <div>Coût total crédit : <span id="cout-total">—</span></div>
   </div>
-
-  <table id="main-table">
-    <thead>
-      <tr>
-        <th>№</th><th>Date</th><th>Capital initial</th><th>Intérêts</th><th>Frais</th><th>Capital remboursé</th><th>Capital final</th><th>Mensualité</th>
-      </tr>
-    </thead>
-    <tbody id="tbody"></tbody>
-  </table>
 </div>
 
-<script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
-<script src="https://unpkg.com/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+<table>
+<thead>
+<tr>
+<th>№</th>
+<th>Date</th>
+<th>Capital initial</th>
+<th>Intérêts</th>
+<th>Frais</th>
+<th>Capital remboursé</th>
+<th>Capital final</th>
+<th>Mensualité</th>
+</tr>
+</thead>
+<tbody id="tbody"></tbody>
+</table>
 
-<script>
-console.log("Widget chargé !");
-
-function fmtNum(n){ return (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2}); }
-function fmtDate(d){ const dt = new Date(d); return isNaN(dt) ? "—" : dt.toLocaleDateString("fr-FR"); }
-function round2(n){ return Math.round(Number(n) * 100) / 100; }
-
-let params = null;
-
-function calculEcheancier(){
-  if (!params) return { rows:[], mensualiteBase:0, totalInterets:0, totalFrais:0, coutTotal:0 };
-
-  const montant = Number(params.Montant || 0);
-  const duree = Number(params.Duree_Mois || 0);
-  let tauxAnnuel = Number(params.TauxAnnuel || 0);
-  const typeTaux = String(params.TypeTaux || "Proportionnel");
-  const fraisType = String(params.Frais_bancaires || "Frais fixes");
-  const fraisFixes = Number(params.FraisFixesParEcheance || 0);
-  const fraisVarTaux = Number(params.FraisVariablesTaux || 0);
-  const datePrem = params.DatePremiereEcheance ? new Date(params.DatePremiereEcheance) : new Date();
-
-  if (tauxAnnuel > 1) tauxAnnuel = tauxAnnuel / 100;
-  const tauxMensuel = typeTaux.toLowerCase().includes("proportion")
-    ? (tauxAnnuel / 12)
-    : (Math.pow(1 + tauxAnnuel, 1/12) - 1);
-
-  let mensualiteBase = 0;
-  if (duree > 0){
-    mensualiteBase = (tauxMensuel > 0)
-      ? montant * tauxMensuel / (1 - Math.pow(1 + tauxMensuel, -duree))
-      : montant / duree;
-  }
-  mensualiteBase = round2(mensualiteBase);
-
-  let capitalRestant = round2(montant);
-  const rows = [];
-  let totalInterets = 0, totalFrais = 0;
-
-  for (let i=1; i<=duree; i++){
-    const interet = round2(capitalRestant * tauxMensuel);
-    const frais = fraisType.toLowerCase().includes("fixe")
-      ? round2(fraisFixes)
-      : round2(mensualiteBase * fraisVarTaux);
-
-    let capitalRemb = round2(mensualiteBase - interet);
-    if (i === duree && capitalRemb > capitalRestant) capitalRemb = capitalRestant;
-    const capitalFinal = round2(capitalRestant - capitalRemb);
-    const mensualiteTotale = round2(mensualiteBase + frais);
-
-    const dateEch = new Date(datePrem.getFullYear(), datePrem.getMonth() + (i-1), datePrem.getDate());
-
-    rows.push({
-      Numero:i,
-      Date:dateEch,
-      CapitalInitial:capitalRestant,
-      Interets:interet,
-      MontantFrais:frais,
-      CapitalRembourse:capitalRemb,
-      CapitalFinal:capitalFinal,
-      Mensualite:mensualiteTotale
-    });
-
-    totalInterets = round2(totalInterets + interet);
-    totalFrais    = round2(totalFrais + frais);
-    capitalRestant= capitalFinal;
-  }
-
-  const coutTotal = round2(montant + totalInterets + totalFrais);
-  return { rows, mensualiteBase, totalInterets, totalFrais, coutTotal };
-}
-
-function render(){
-  const tb = document.getElementById("tbody");
-  tb.innerHTML = "";
-
-  if (!params){
-    tb.innerHTML = "<tr><td colspan='8' style='text-align:center;color:#888;'>Sélectionnez une ligne dans PARAMETRES</td></tr>";
-    return;
-  }
-
-  const { rows, mensualiteBase, totalInterets, totalFrais, coutTotal } = calculEcheancier();
-
-  document.getElementById("montant").textContent = fmtNum(params.Montant);
-  document.getElementById("taux").textContent = (params.TauxAnnuel ? ((params.TauxAnnuel > 1 ? params.TauxAnnuel : params.TauxAnnuel*100).toFixed(3) + " %") : "—");
-  document.getElementById("mensualite").textContent = fmtNum(mensualiteBase);
-  document.getElementById("duree").textContent = params.Duree_Mois || "—";
-  document.getElementById("total-interets").textContent = fmtNum(totalInterets);
-  document.getElementById("cout-total").textContent = fmtNum(coutTotal);
-
-  for (const r of rows){
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${r.Numero}</td>
-      <td>${fmtDate(r.Date)}</td>
-      <td>${fmtNum(r.CapitalInitial)}</td>
-      <td>${fmtNum(r.Interets)}</td>
-      <td>${fmtNum(r.MontantFrais)}</td>
-      <td>${fmtNum(r.CapitalRembourse)}</td>
-      <td>${fmtNum(r.CapitalFinal)}</td>
-      <td>${fmtNum(r.Mensualite)}</td>
-    `;
-    tb.appendChild(tr);
-  }
-}
-
-// Fonction pour répéter l'en-tête avec tailles différentes et wrapper
-function splitTableForPdf() {
-  const tbody = document.getElementById("tbody");
-  const rows = Array.from(tbody.querySelectorAll("tr"));
-  const firstChunkSize = 35; // Première page
-  const otherChunkSize = 40; // Pages suivantes
-  const tableHeader = document.querySelector("thead").outerHTML;
-  const container = document.getElementById("pdf-content");
-
-  // Supprimer toutes les tables sauf le header-block
-  const tables = container.querySelectorAll("table");
-  tables.forEach(t => t.remove());
-
-  let i = 0;
-  let chunkSize = firstChunkSize;
-
-  while (i < rows.length) {
-    const chunkRows = rows.slice(i, i + chunkSize)
-      .map(r => r.outerHTML)
-      .join("");
-    const newTable = document.createElement("table");
-    newTable.innerHTML = tableHeader + `<tbody>${chunkRows}</tbody>`;
-
-    const wrapper = document.createElement("div");
-    if (i > 0) wrapper.classList.add("page-break");
-    wrapper.appendChild(newTable);
-    container.appendChild(wrapper);
-
-    i += chunkSize;
-    chunkSize = otherChunkSize; // Après la première page
-  }
-}
-
-// Boutons
-document.addEventListener("click", (e) => {
-  if (e.target.id === "btn-refresh") render();
-  if (e.target.id === "btn-pdf"){
-    splitTableForPdf(); // Ajout avant export PDF
-    const element = document.getElementById("pdf-content");
-    const opt = {
-      margin: 10,
-      filename: `Echéancier ${fmtNum(params.Montant).replace(/\s/g,'')}€ à ${params.TauxAnnuel > 1 ? params.TauxAnnuel : (params.TauxAnnuel*100).toFixed(2)}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-    };
-
-    html2pdf().from(element).set(opt).toPdf().get('pdf').then(function (pdf) {
-      const totalPages = pdf.internal.getNumberOfPages();
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-
-      for (let i = 1; i <= totalPages; i++) {
-        pdf.setPage(i);
-        pdf.setFontSize(10);
-        pdf.text(`Page ${i} sur ${totalPages}`, pageWidth - 30, pageHeight - 10);
-      }
-    }).save();
-  }
-});
-
-// Grist intégration
-grist.ready();
-grist.onRecord((row) => {
-  params = row;
-  render();
-});
-grist.onRecords((rows, mappings) => {
-  let selected = null;
-  if (mappings && mappings.selectedRowId != null){
-    selected = rows.find(r => r.id === mappings.selectedRowId) || null;
-  } else if (rows && rows.length){
-    selected = rows[0];
-  }
-  params = selected || null;
-  render();
-});
-</script>
+<script src="JS.js"></script>
 </body>
 </html>
