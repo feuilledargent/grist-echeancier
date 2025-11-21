@@ -2,6 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Échéancier Prêt</title>
 <style>
 body { font-family: Arial, sans-serif; margin: 20px; }
@@ -12,7 +13,10 @@ th, td { border: 1px solid #ccc; padding: 6px; text-align: right; }
 th { background: #f0f0f0; }
 .page-counter { text-align: center; font-weight: bold; }
 .page-break { page-break-after: always; }
-#btn-print { margin-top: 15px; padding: 10px 15px; background: #0078d7; color: #fff; border: none; cursor: pointer; }
+button { margin-top: 15px; padding: 10px 15px; background: #0078d7; color: #fff; border: none; cursor: pointer; }
+button:hover { background: #005fa3; }
+#btn-pdf { background: #28a745; }
+#btn-pdf:hover { background: #1e7e34; }
 </style>
 </head>
 <body>
@@ -42,17 +46,23 @@ th { background: #f0f0f0; }
 </table>
 
 <button id="btn-print">Imprimer</button>
+<button id="btn-pdf">Télécharger PDF</button>
+
+<!-- jsPDF CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <script>
 function fmtNum(n){return (n==null||isNaN(n))?"—":Number(n).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtDate(d){const dt=new Date(d);return isNaN(dt)?"—":dt.toLocaleDateString("fr-FR");}
 function round2(n){return Math.round(Number(n)*100)/100;}
 
+let rows=[];
+
 document.getElementById("loan-form").addEventListener("submit",function(e){
   e.preventDefault();
   const montant=Number(document.getElementById("montant").value);
   const dureeAnnees=Number(document.getElementById("dureeAnnees").value);
-  const duree=dureeAnnees*12; // conversion en mois
+  const duree=dureeAnnees*12;
   let tauxAnnuel=Number(document.getElementById("taux").value)/100;
   const fraisFixes=Number(document.getElementById("fraisFixes").value);
   const datePrem=document.getElementById("datePrem").value?new Date(document.getElementById("datePrem").value):new Date();
@@ -62,7 +72,7 @@ document.getElementById("loan-form").addEventListener("submit",function(e){
   mensualiteBase=round2(mensualiteBase);
 
   let capitalRestant=round2(montant);
-  const rows=[];
+  rows=[];
   let totalInterets=0,totalFrais=0;
   for(let i=1;i<=duree;i++){
     const interet=round2(capitalRestant*tauxMensuel);
@@ -88,33 +98,37 @@ document.getElementById("loan-form").addEventListener("submit",function(e){
 
   const tb=document.getElementById("tbody");
   tb.innerHTML="";
-  let count=0,pageNumber=1;
-  const totalPages=Math.ceil(rows.length<=35?1:1+(rows.length-35)/40);
   for(const r of rows){
     const tr=document.createElement("tr");
     tr.innerHTML=`<td>${r.Numero}</td><td>${fmtDate(r.Date)}</td><td>${fmtNum(r.CapitalInitial)}</td><td>${fmtNum(r.Interets)}</td><td>${fmtNum(r.MontantFrais)}</td><td>${fmtNum(r.CapitalRembourse)}</td><td>${fmtNum(r.CapitalFinal)}</td><td>${fmtNum(r.Mensualite)}</td>`;
     tb.appendChild(tr);
-    count++;
-    const limit=pageNumber===1?35:39;
-    if(count===limit){
-      const counterRow=document.createElement("tr");
-      counterRow.innerHTML=`<td colspan="8" class="page-counter">Page ${pageNumber} sur ${totalPages}</td>`;
-      tb.appendChild(counterRow);
-      const breakRow=document.createElement("tr");
-      breakRow.classList.add("page-break");
-      tb.appendChild(breakRow);
-      pageNumber++;
-      count=0;
-    }
-  }
-  if(count>0){
-    const counterRow=document.createElement("tr");
-    counterRow.innerHTML=`<td colspan="8" class="page-counter">Page ${pageNumber} sur ${totalPages}</td>`;
-    tb.appendChild(counterRow);
   }
 });
 
 document.getElementById("btn-print").addEventListener("click",()=>{parent.print();});
+
+document.getElementById("btn-pdf").addEventListener("click",()=>{
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+  doc.setFontSize(14);
+  doc.text("Échéancier du prêt", 40, 40);
+  doc.setFontSize(10);
+  doc.text(`Montant: ${document.getElementById("recap-montant").textContent}`, 40, 70);
+  doc.text(`Taux: ${document.getElementById("recap-taux").textContent}`, 40, 85);
+  doc.text(`Mensualité: ${document.getElementById("recap-mensualite").textContent}`, 40, 100);
+  doc.text(`Durée: ${document.getElementById("recap-duree").textContent}`, 40, 115);
+  doc.text(`Total intérêts: ${document.getElementById("recap-interets").textContent}`, 40, 130);
+  doc.text(`Coût total: ${document.getElementById("recap-cout").textContent}`, 40, 145);
+
+  let y = 180;
+  rows.forEach((r)=>{
+    doc.text(`${r.Numero} | ${fmtDate(r.Date)} | ${fmtNum(r.CapitalInitial)} | ${fmtNum(r.Interets)} | ${fmtNum(r.MontantFrais)} | ${fmtNum(r.CapitalRembourse)} | ${fmtNum(r.CapitalFinal)} | ${fmtNum(r.Mensualite)}`, 40, y);
+    y += 15;
+    if(y > 750){ doc.addPage(); y = 40; }
+  });
+
+  doc.save("echeancier.pdf");
+});
 </script>
 
 </body>
