@@ -105,7 +105,7 @@ document.getElementById("loan-form").addEventListener("submit",function(e){
   }
 });
 
-document.getElementById("btn-print").addEventListener("click",()=>{parent.print();});
+document.getElementById("btn-print").addEventListener("click",()=>{window.print();});
 
 document.getElementById("btn-pdf").addEventListener("click",()=>{
   const { jsPDF } = window.jspdf;
